@@ -145,7 +145,7 @@ def gerar_mensagem_ia(titulo, texto, categoria="creator"):
 def enviar_mensagem_playwright(username, assunto, mensagem):
     print(f"Abrindo navegador para enviar mensagem para u/{username}...")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=['--disable-blink-features=AutomationControlled'])
+        browser = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
         
         # Carrega a sessão salva
         context = browser.new_context()
