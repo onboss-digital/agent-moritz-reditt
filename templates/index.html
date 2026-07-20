@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumpic Autoprospect - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>Lumpic Autoprospect (Moritz)</h1>
+            <p>Painel de Controle e Monitoramento</p>
+        </header>
+
+        <section class="stats-grid">
+            <div class="glass-panel stat-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                </div>
+                <div class="stat-info">
+                    <h3>Total Enviado</h3>
+                    <div class="value" id="total-enviado">0</div>
+                </div>
+            </div>
+
+            <div class="glass-panel stat-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color)" stroke-width="2" id="health-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                </div>
+                <div class="stat-info" style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>Saúde da Conta (Hoje)</h3>
+                        <span id="daily-count-text" style="font-size: 0.9rem; font-weight: bold; color: var(--text-secondary);">0 / 30</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.5); border-radius: 4px; margin-top: 0.5rem; overflow: hidden;">
+                        <div id="health-bar" style="height: 100%; width: 0%; background: var(--success-color); transition: all 0.5s ease; border-radius: 4px;"></div>
+                    </div>
+                    <small id="health-status-text" style="color: var(--success-color); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Seguro e Estável</small>
+                </div>
+            </div>
+
+            <div class="glass-panel stat-card">
+                <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1);">
+                    <div class="status-indicator paused" id="status-indicator"></div>
+                </div>
+                <div class="stat-info">
+                    <h3>Status do Robô</h3>
+                    <div class="value" id="status-text" style="font-size: 1.5rem;">Pausado</div>
+                </div>
+            </div>
+            
+            <!-- Post-it Note: Rotina do Robô -->
+            <div class="glass-panel stat-card" style="background: #fef08a; color: #1e293b; border: none; transform: rotate(2deg); border-radius: 2px; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); position: relative;">
+                <div style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 20px; background: rgba(255,255,255,0.4); border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);"></div>
+                <div class="stat-info" style="width: 100%;">
+                    <h3 style="color: #1e293b; font-family: 'Comic Sans MS', cursive, sans-serif; font-size: 1.1rem; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 0.3rem; margin-top: 0.5rem; text-align: center;">📌 Rotina do Moritz</h3>
+                    <ul style="list-style: none; padding: 0; margin-top: 0.5rem; font-size: 0.85rem; font-family: 'Comic Sans MS', cursive, sans-serif; line-height: 1.6;">
+                        <li>🔎 <b>Nova Busca:</b> A cada 30 min</li>
+                        <li>⏳ <b>Envio (Anti-Spam):</b> 1 a cada ~3 min</li>
+                        <li>💤 <b>Dorme:</b> 4h após bater meta diária</li>
+                        <li>🔋 <b>Expediente:</b> 24 horas por dia</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="main-content">
+            <div class="glass-panel console-container premium-glow">
+                <div class="console-header">
+                    <h3>Terminal de IA (Log ao Vivo)</h3>
+                    <small>Histórico das últimas ações automáticas</small>
+                </div>
+                <div class="console-output scanlines" id="console-output">
+                    <!-- Logs serão inseridos aqui pelo JS -->
+                    <div class="console-line system">[SISTEMA] Aguardando inicialização do robô...</div>
+                </div>
+            </div>
+
+            <div class="glass-panel control-panel premium-glow">
+                <div class="mascot-container">
+                    <svg id="robot-mascot" class="paused" viewBox="0 0 100 100" width="160" height="160" style="image-rendering: pixelated; filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));">
+                        <!-- Nome Moritz -->
+                        <text x="50" y="8" font-family="monospace" font-size="8" font-weight="bold" fill="#6ee7b7" text-anchor="middle" letter-spacing="1">MORITZ</text>
+                        
+                        <!-- Cabelo (Estilo Habbo) -->
+                        <rect x="33" y="15" width="34" height="8" fill="#171717" />
+                        <rect x="31" y="20" width="6" height="15" fill="#171717" />
+                        <rect x="63" y="20" width="6" height="15" fill="#171717" />
+                        <rect x="35" y="13" width="15" height="5" fill="#171717" />
+                        
+                        <!-- Rosto (Pele) -->
+                        <rect x="35" y="23" width="30" height="22" fill="#fcd34d" />
+                        
+                        <!-- Olhos -->
+                        <g id="robot-eyes">
+                            <rect x="40" y="28" width="6" height="6" fill="#ffffff" />
+                            <rect x="42" y="30" width="3" height="3" fill="#000000" />
+                            <rect x="54" y="28" width="6" height="6" fill="#ffffff" />
+                            <rect x="54" y="30" width="3" height="3" fill="#000000" />
+                        </g>
+                        <!-- Óculos Thug Life (Invisível por Padrão) -->
+                        <g id="robot-glasses" style="opacity: 0;">
+                            <!-- Haste e Ponte -->
+                            <rect x="32" y="26" width="36" height="2" fill="#000000" />
+                            <!-- Lente Esquerda (Escada Pixelada) -->
+                            <rect x="34" y="26" width="13" height="3" fill="#000000" />
+                            <rect x="36" y="29" width="9" height="2" fill="#000000" />
+                            <rect x="38" y="31" width="5" height="2" fill="#000000" />
+                            <!-- Lente Direita (Escada Pixelada) -->
+                            <rect x="53" y="26" width="13" height="3" fill="#000000" />
+                            <rect x="55" y="29" width="9" height="2" fill="#000000" />
+                            <rect x="57" y="31" width="5" height="2" fill="#000000" />
+                            
+                            <!-- Reflexos Lente Esquerda -->
+                            <rect x="36" y="26" width="3" height="1.5" fill="#ffffff" />
+                            <rect x="39" y="27.5" width="2" height="1.5" fill="#ffffff" />
+                            <!-- Reflexos Lente Direita -->
+                            <rect x="55" y="26" width="3" height="1.5" fill="#ffffff" />
+                            <rect x="58" y="27.5" width="2" height="1.5" fill="#ffffff" />
+                        </g>
+                        
+                        <!-- Corpo / Camisa Preta -->
+                        <rect x="25" y="45" width="50" height="35" fill="#09090b" rx="2" />
+                        
+                        <!-- Logo Completa da Lumpic na Camisa (Verde Neon #C3F53C) -->
+                        <!-- Seta do Mouse -->
+                        <polygon points="36,60 36,53 41,58 38,58 39,61 38,62 36.5,58.5" fill="#a3e635" />
+                        <rect x="34" y="52" width="1.5" height="1.5" fill="#a3e635" />
+                        <rect x="35" y="50" width="1.5" height="1.5" fill="#a3e635" />
+                        
+                        <!-- Texto Lumpic -->
+                        <text x="44" y="60" font-family="'Inter', sans-serif" font-size="6.5" font-weight="800" fill="#a3e635">Lumpic</text>
+
+                        <!-- Braços (Mangas Pretas) -->
+                        <g id="robot-arm-l">
+                            <rect x="15" y="45" width="10" height="25" fill="#09090b" rx="2" />
+                            <!-- Mão Esquerda (Pele) -->
+                            <rect x="15" y="70" width="10" height="8" fill="#fcd34d" rx="1" />
+                        </g>
+                        <g id="robot-arm-r">
+                            <rect x="75" y="45" width="10" height="25" fill="#09090b" rx="2" />
+                            <!-- Mão Direita (Pele) -->
+                            <rect x="75" y="70" width="10" height="8" fill="#fcd34d" rx="1" />
+                        </g>
+
+                        <!-- Laptop na Mesa (Macbook style) -->
+                        <polygon points="23,85 77,85 85,75 15,75" fill="#94a3b8" />
+                        <rect x="18" y="85" width="64" height="3" rx="1.5" fill="#64748b" />
+                        <rect x="45" y="85" width="10" height="1" fill="#475569" /> <!-- Trackpad div -->
+                    </svg>
+                </div>
+
+                <div style="width: 100%; display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                    <button class="btn btn-start" id="btn-start">
+                        Iniciar Prospecção
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop" disabled>
+                        Parar Robô
+                    </button>
+                    
+                    <button onclick="openConfigModal()" style="margin-top: 0.5rem; width: 100%; background: transparent; border: 1px dashed var(--glass-border); color: var(--text-secondary); padding: 0.75rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.3s; font-weight: 600;">
+                        ⚙️ Configurar Alvos (Palavras/Fóruns)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="recent-targets">
+            <div class="glass-panel" style="margin-top: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                    <h3 style="color: var(--text-secondary); margin: 0;">Últimos Alvos Prospectados</h3>
+                    <div class="date-filters" style="display: flex; gap: 0.5rem;">
+                        <button class="filter-btn active" data-filter="recentes" style="background: var(--glass-highlight); border: 1px solid var(--glass-border); color: #fff; padding: 0.3rem 0.8rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;">Recentes</button>
+                        <button class="filter-btn" data-filter="hoje" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.3rem 0.8rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;">Hoje</button>
+                        <button class="filter-btn" data-filter="7dias" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.3rem 0.8rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;">7 Dias</button>
+                        <button class="filter-btn" data-filter="tudo" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.3rem 0.8rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;">Tudo</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-secondary);">
+                                <th style="padding: 0.75rem;">Usuário</th>
+                                <th style="padding: 0.75rem;">Fórum (Subreddit)</th>
+                                <th style="padding: 0.75rem;">Palavra-Chave</th>
+                                <th style="padding: 0.75rem;">Data/Hora</th>
+                                <th style="padding: 0.75rem; text-align: center;">Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-targets-body">
+                            <!-- JS vai preencher isso -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal de Detalhes -->
+    <div id="details-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="glass-panel premium-glow" style="max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                <h3 style="color: var(--accent-color);">Detalhes da Prospecção</h3>
+                <button onclick="document.getElementById('details-modal').style.display='none'" style="background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Usuário Contatado</span>
+                <div id="modal-user" style="font-weight: bold; font-size: 1.1rem; color: #fff;"></div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Título do Post Original</span>
+                <div id="modal-title" style="padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid var(--glass-border); color: #e2e8f0; font-style: italic;"></div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Mensagem de Convite Enviada (IA)</span>
+                <div id="modal-message" style="padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid var(--accent-glow); color: #a7f3d0; font-family: 'JetBrains Mono', monospace; line-height: 1.6; white-space: pre-wrap;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuração de Alvos -->
+    <div id="config-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="glass-panel premium-glow" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                <h3 style="color: var(--accent-color);">Alvos e Filtros (Configuração)</h3>
+                <button onclick="document.getElementById('config-modal').style.display='none'" style="background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                
+                <!-- Coluna de Palavras-chave -->
+                <div>
+                    <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Palavras-Chave de Busca</h4>
+                    
+                    <!-- Abas (Tabs) -->
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                        <button id="tab-creator" onclick="switchKeywordTab('creator')" style="flex: 1; background: var(--accent-color); color: #000; border: none; padding: 0.4rem; border-radius: 0.25rem; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.3s;">Creator</button>
+                        <button id="tab-empresa" onclick="switchKeywordTab('empresa')" style="flex: 1; background: transparent; color: var(--text-secondary); border: 1px solid var(--glass-border); padding: 0.4rem; border-radius: 0.25rem; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: 0.3s;">Empresa</button>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <input type="text" id="new-keyword" placeholder="ex: design gráfico" style="flex: 1; padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); color: #fff;">
+                        <button onclick="addConfig('keyword')" style="background: var(--accent-color); color: #000; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: bold;">+</button>
+                    </div>
+                    <div id="keywords-list" style="background: rgba(0,0,0,0.3); border-radius: 0.5rem; padding: 1rem; height: 260px; overflow-y: auto; border: 1px solid var(--glass-border);">
+                        <!-- Renderizado via JS -->
+                    </div>
+                </div>
+
+                <!-- Coluna de Subreddits -->
+                <div>
+                    <h4 style="color: var(--text-secondary); margin-bottom: 1rem;">Fóruns Monitorados</h4>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <input type="text" id="new-subreddit" placeholder="ex: brdev" style="flex: 1; padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); color: #fff;">
+                        <button onclick="addConfig('subreddit')" style="background: var(--accent-color); color: #000; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: bold;">+</button>
+                    </div>
+                    <div id="subreddits-list" style="background: rgba(0,0,0,0.3); border-radius: 0.5rem; padding: 1rem; height: 300px; overflow-y: auto; border: 1px solid var(--glass-border);">
+                        <!-- Renderizado via JS -->
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--danger-color); margin-top: 0.5rem;">Cuidado: Para buscar no Reddit inteiro, adicione apenas "all". Isso pode sobrecarregar a rede.</p>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

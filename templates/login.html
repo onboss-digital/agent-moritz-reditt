@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Lumpic Autoprospect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        .login-box {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            padding: 3rem 2rem;
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 0.5rem;
+            color: #fff;
+            font-family: inherit;
+            font-size: 1rem;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input[type="password"]:focus {
+            border-color: var(--accent-color);
+        }
+        .error-msg {
+            color: var(--danger-color);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel login-box">
+        <h1 style="font-weight: 800; font-size: 2rem; margin-bottom: 0.5rem;">
+            Lumpic<span style="color: var(--accent-color);">.</span>
+        </h1>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.9rem;">
+            Acesso Restrito ao Robô de Prospecção
+        </p>
+        
+        {% if erro %}
+            <div class="error-msg">{{ erro }}</div>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <input type="password" name="password" placeholder="Digite a Senha Mestra" required autofocus>
+            <button type="submit" class="btn btn-start" style="width: 100%;">
+                Desbloquear Sistema
+            </button>
+        </form>
+    </div>
+</body>
+</html>

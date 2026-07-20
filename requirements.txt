@@ -1,0 +1,6 @@
+google-generativeai
+playwright
+python-dotenv
+browser-cookie3
+requests
+flask

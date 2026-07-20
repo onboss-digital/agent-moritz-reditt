@@ -1,0 +1,18 @@
+# Ignorar arquivos do ambiente virtual e bibliotecas
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+
+# Ignorar o arquivo do banco de dados (SQLite) para não sobrescrever em produção
+bot_database.db
+bot_database.db-journal
+
+# Ignorar arquivo de cookies sensíveis
+cookies.json
+
+# Ignorar pastas de cache e build
+.pytest_cache/
+.vscode/
+.idea/
