@@ -163,6 +163,15 @@ def enviar_mensagem_playwright(username, assunto, mensagem):
             # Vamos usar o sistema de Mensagem Privada clássico do Reddit (mais estável para automação que o Chat)
             page.goto(f"https://www.reddit.com/message/compose/?to={username}")
             
+            # Verifica se o Reddit derrubou a sessão por causa do IP da Nuvem
+            if "login" in page.url or "register" in page.url:
+                print("  -> [ERRO FATAL] O Reddit deslogou a nossa sessão por segurança (novo IP da VPS).")
+                print("  -> É necessário logar novamente gerando um novo cookies.json pelo seu computador.")
+                import os
+                os.makedirs("erros", exist_ok=True)
+                page.screenshot(path=f"erros/erro_login_reddit_{username}.png")
+                return False
+            
             # PREENCHE O ASSUNTO
             print("  -> Preenchendo assunto...")
             try:
@@ -212,10 +221,12 @@ def enviar_mensagem_playwright(username, assunto, mensagem):
         except Exception as e:
             print(f"[ERRO] Falha ao enviar mensagem pelo navegador: {e}")
             try:
-                page.screenshot(path=f"erro_reddit_{username}.png")
-                with open(f"erro_reddit_{username}.html", "w", encoding="utf-8") as f:
+                import os
+                os.makedirs("erros", exist_ok=True)
+                page.screenshot(path=f"erros/erro_reddit_{username}.png")
+                with open(f"erros/erro_reddit_{username}.html", "w", encoding="utf-8") as f:
                     f.write(page.content())
-                print(f"-> Salvei uma foto e o código fonte em 'erro_reddit_{username}.png/html' para debug!")
+                print(f"-> Salvei uma foto e o código fonte na pasta 'erros/' para debug!")
             except:
                 pass
             return False
