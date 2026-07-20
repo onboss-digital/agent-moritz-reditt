@@ -65,6 +65,15 @@ function setMascotState(isWorking) {
 }
 
 function updateConsole(logs) {
+    // Verifica se o usuário está no final da barra de rolagem
+    const isScrolledToBottom = consoleOutput.scrollHeight - consoleOutput.clientHeight <= consoleOutput.scrollTop + 10;
+    const currentScrollTop = consoleOutput.scrollTop;
+    
+    // Só atualiza a tela se tiver log novo (evita piscar a tela e perder a posição de leitura)
+    const newLogsStr = JSON.stringify(logs);
+    if (consoleOutput.dataset.lastLogs === newLogsStr) return;
+    consoleOutput.dataset.lastLogs = newLogsStr;
+
     consoleOutput.innerHTML = '';
     logs.forEach(line => {
         const div = document.createElement('div');
@@ -73,18 +82,27 @@ function updateConsole(logs) {
         // Estilizar a linha baseado no conteúdo
         if (line.includes('[ERRO]')) {
             div.classList.add('error');
+            div.style.color = '#f87171'; // Vermelho
         } else if (line.includes('[SUCESSO]') || line.includes('[!] ALVO ENCONTRADO')) {
             div.classList.add('success');
+            div.style.color = '#a3e635'; // Verde
         } else if (line.includes('[SISTEMA]')) {
             div.classList.add('system');
+            div.style.color = '#fbbf24'; // Amarelo
+        } else {
+            div.style.color = '#e2e8f0'; // Branco/Cinza padrão
         }
         
         div.textContent = line;
         consoleOutput.appendChild(div);
     });
     
-    // Rola para o final automaticamente
-    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    // Rola para o final automaticamente SOMENTE se o usuário já estava no final
+    if (isScrolledToBottom) {
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    } else {
+        consoleOutput.scrollTop = currentScrollTop; // Mantém onde ele estava lendo
+    }
 }
 
 function fetchStatus() {
