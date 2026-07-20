@@ -55,8 +55,9 @@ def run_bot():
         env["PYTHONUNBUFFERED"] = "1"
         
         # Executa o bot.py e captura a saída
+        import sys
         bot_process = subprocess.Popen(
-            ["python", "bot.py"],
+            [sys.executable, "bot.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
