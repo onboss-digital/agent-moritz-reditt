@@ -316,3 +316,52 @@ setMascotState(false);
 // Busca status a cada 2 segundos
 pollInterval = setInterval(fetchStatus, 2000);
 fetchStatus();
+
+// Modal de Configuração do Agente (APIs)
+function openAgentConfigModal() {
+    document.getElementById('agent-config-modal').style.display = 'flex';
+    const container = document.getElementById('apis-list-container');
+    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Carregando dados das APIs...</div>';
+    
+    fetch('/api/agent-config')
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = '';
+            if(data.apis && data.apis.length > 0) {
+                data.apis.forEach(api => {
+                    const statusColor = api.is_active ? 'var(--success-color)' : 'var(--text-secondary)';
+                    const badgeText = api.is_active ? '🟢 [EM USO] ' + api.status : '⚪ ' + api.status;
+                    
+                    container.innerHTML += `
+                        <div style="background: rgba(0,0,0,0.4); border: 1px solid ${api.is_active ? 'var(--success-color)' : 'var(--glass-border)'}; border-radius: 0.5rem; padding: 1rem; position: relative;">
+                            ${api.is_active ? '<div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--success-color); border-radius: 0.5rem 0 0 0.5rem;"></div>' : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding-left: 0.5rem;">
+                                <h4 style="color: #fff; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                                    ${api.name}
+                                    <span style="font-size: 0.7rem; background: ${statusColor}40; color: ${statusColor}; padding: 0.2rem 0.6rem; border-radius: 1rem; border: 1px solid ${statusColor}; font-weight: bold; letter-spacing: 0.5px;">${badgeText}</span>
+                                </h4>
+                            </div>
+                            
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                                <strong>Chave:</strong> <span style="font-family: monospace;">${api.key_masked}</span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #e2e8f0; margin-bottom: 0.5rem;">
+                                <span>Consumido: <strong>${api.usage}</strong></span>
+                                <span>Restante: <strong>${api.remaining}</strong> (Limite: ${api.limit})</span>
+                            </div>
+                            
+                            <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden;">
+                                <div style="height: 100%; width: ${api.percentage}%; background: ${api.percentage > 90 ? 'var(--danger-color)' : api.percentage > 70 ? '#f59e0b' : 'var(--accent-color)'}; transition: width 0.5s;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhuma API encontrada.</div>';
+            }
+        })
+        .catch(err => {
+            container.innerHTML = '<div style="text-align: center; color: var(--danger-color); padding: 2rem;">Erro ao carregar os dados.</div>';
+        });
+}

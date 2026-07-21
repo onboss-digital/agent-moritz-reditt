@@ -3,6 +3,8 @@ import sqlite3
 import subprocess
 import threading
 import time
+import requests
+from dotenv import dotenv_values
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from functools import wraps
 
@@ -257,6 +259,73 @@ def del_config():
     conn.commit()
     conn.close()
     return jsonify({"success": True})
+
+@app.route('/api/agent-config', methods=['GET'])
+@login_required
+def get_agent_config():
+    env_vars = dotenv_values(".env")
+    openrouter_key = env_vars.get("OPENROUTER_API_KEY")
+    gemini_key = env_vars.get("GEMINI_API_KEY")
+    
+    active_api = "Nenhuma"
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_database.db")
+    if os.path.exists(db_path):
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_state WHERE key='active_api'")
+            res = cursor.fetchone()
+            if res:
+                active_api = res[0]
+            conn.close()
+        except Exception as e:
+            pass
+            
+    apis = []
+    
+    # OpenRouter API
+    if openrouter_key:
+        try:
+            resp = requests.get("https://openrouter.ai/api/v1/auth/key", headers={"Authorization": f"Bearer {openrouter_key}"}, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json().get('data', {})
+                limit = data.get('limit')
+                usage = data.get('usage', 0)
+                limit_text = "Ilimitado" if limit is None else f"${limit}"
+                restante_text = "Ilimitado" if limit is None else f"${limit - usage:.4f}"
+                pct = 0 if limit is None else min((usage / limit) * 100, 100)
+                
+                apis.append({
+                    "name": "OpenRouter",
+                    "status": "Ativo" if active_api == "OpenRouter" else "Em Espera (Fallback)",
+                    "is_active": active_api == "OpenRouter",
+                    "key_masked": f"{openrouter_key[:8]}...{openrouter_key[-4:]}",
+                    "usage": f"${usage:.4f}",
+                    "limit": limit_text,
+                    "remaining": restante_text,
+                    "percentage": pct
+                })
+        except Exception as e:
+            print("Erro openrouter API:", e)
+            pass
+
+    # Gemini API
+    if gemini_key:
+        apis.append({
+            "name": "Google Gemini (Nativo)",
+            "status": "Ativo" if active_api == "Gemini" else "Em Espera (Fallback)",
+            "is_active": active_api == "Gemini",
+            "key_masked": f"{gemini_key[:8]}...{gemini_key[-4:]}",
+            "usage": "Cota Gerenciada pelo Google",
+            "limit": "-",
+            "remaining": "-",
+            "percentage": 0
+        })
+
+    if not apis:
+        apis.append({"name": "Nenhuma API Configurada", "status": "Inativo", "is_active": False, "key_masked": "-", "usage": "-", "limit": "-", "remaining": "-", "percentage": 0})
+        
+    return jsonify({"apis": apis})
 
 if __name__ == '__main__':
     # Para desenvolvimento

@@ -5,6 +5,7 @@ import time
 import random
 import requests
 import re
+from openai import OpenAI
 import google.generativeai as genai
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
@@ -93,11 +94,22 @@ def registrar_envio(conn, username, subreddit, keyword, title, message, permalin
         print(f"Erro ao registrar envio no banco: {e}")
 
 # ==========================================
-# GEMINI AI - GERAÇÃO DE MENSAGEM
+# IA - GERAÇÃO DE MENSAGEM COM FALLBACK
 # ==========================================
-def gerar_mensagem_ia(titulo, texto, categoria="creator"):
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel('gemini-2.5-flash')
+def atualizar_api_ativa(conn, api_name):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS system_state (key TEXT PRIMARY KEY, value TEXT)")
+        cursor.execute("INSERT OR REPLACE INTO system_state (key, value) VALUES ('active_api', ?)", (api_name,))
+        conn.commit()
+    except Exception as e:
+        print(f"Erro ao salvar state: {e}")
+
+def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
     
     if categoria == "empresa":
         perfil_foco = "Ela conecta profissionais do mercado digital (como designers, editores de vídeo e gestores de tráfego) diretamente com empresas e clientes que precisam desses serviços todos os dias, de um jeito simples e prático. O melhor é que você pode buscar talentos e publicar suas necessidades de forma totalmente gratuita."
@@ -136,8 +148,33 @@ def gerar_mensagem_ia(titulo, texto, categoria="creator"):
     3. Retorne APENAS o texto final da mensagem.
     """
     
-    resposta = model.generate_content(prompt)
-    return resposta.text.strip()
+    # 1. Tentar OpenRouter Primeiro
+    try:
+        response = client.chat.completions.create(
+            model="google/gemini-2.5-flash:free",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        atualizar_api_ativa(conn, 'OpenRouter')
+        print("[SISTEMA IA] Mensagem gerada via OpenRouter (gemini-2.5-flash).")
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"[AVISO IA] Falha no OpenRouter: {e}. Iniciando Fallback para Gemini Nativo...")
+        
+    # 2. Fallback para Google Gemini Nativo
+    try:
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        resposta = model.generate_content(prompt)
+        atualizar_api_ativa(conn, 'Gemini')
+        print("[SISTEMA IA] Mensagem gerada via Google Gemini Nativo.")
+        return resposta.text.strip()
+    except Exception as e2:
+        print(f"[ERRO IA FATAL] Ambas as APIs falharam (OpenRouter e Gemini Nativo). Erro Gemini: {e2}")
+        return "Olá! Vi seu post e gostaria de apresentar a Lumpic, uma plataforma grátis de freelancing focada no mercado digital. Se tiver interesse, me mande uma mensagem!"
+
 
 # ==========================================
 # PLAYWRIGHT - ENVIO REAL
@@ -331,7 +368,7 @@ def main():
         for alvo in alvos_encontrados:
             autor = alvo['autor']
             print(f"\nGerando mensagem para u/{autor}...")
-            mensagem = gerar_mensagem_ia(alvo['titulo'], alvo['texto'], alvo['categoria'])
+            mensagem = gerar_mensagem_ia(conn, alvo['titulo'], alvo['texto'], alvo['categoria'])
             
             print(f"Abrindo navegador para enviar mensagem para u/{autor}...")
             sucesso = enviar_mensagem_playwright(autor, alvo['assunto'], mensagem)

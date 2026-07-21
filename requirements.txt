@@ -1,3 +1,4 @@
+openai
 google-generativeai
 playwright
 python-dotenv
