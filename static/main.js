@@ -365,3 +365,100 @@ function openAgentConfigModal() {
             container.innerHTML = '<div style="text-align: center; color: var(--danger-color); padding: 2rem;">Erro ao carregar os dados.</div>';
         });
 }
+
+// --- BLACKLIST INTELIGENTE ---
+function openBlacklistModal() {
+    document.getElementById('blacklist-modal').style.display = 'flex';
+    fetchBlacklist();
+}
+
+function fetchBlacklist() {
+    const container = document.getElementById('blacklist-container');
+    container.innerHTML = '<div style="text-align: center; width: 100%; color: var(--text-secondary); padding: 1rem;">Carregando...</div>';
+    
+    fetch('/api/blacklist')
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = '';
+            if (data.words && data.words.length > 0) {
+                data.words.forEach(item => {
+                    const bg = item.added_by_ia ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)';
+                    const border = item.added_by_ia ? '1px solid var(--danger-color)' : '1px solid var(--glass-border)';
+                    const badge = item.added_by_ia ? '<span style="font-size: 0.6rem; background: var(--danger-color); color: #fff; padding: 0.1rem 0.3rem; border-radius: 0.5rem; margin-left: 0.3rem;">IA</span>' : '';
+                    
+                    container.innerHTML += `
+                        <div style="background: ${bg}; border: ${border}; padding: 0.4rem 0.8rem; border-radius: 2rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <span>${item.word} ${badge}</span>
+                            <button onclick="deleteBlacklistWord('${item.word}')" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; display: flex; align-items: center; font-size: 1.1rem; transition: color 0.3s;" onmouseover="this.style.color='var(--danger-color)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = '<div style="text-align: center; width: 100%; color: var(--text-secondary); padding: 1rem;">Nenhuma palavra na blacklist.</div>';
+            }
+        });
+}
+
+function addBlacklistWord() {
+    const input = document.getElementById('new-blacklist-word');
+    const word = input.value.trim();
+    if (word) {
+        fetch('/api/blacklist', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({word: word})
+        }).then(() => {
+            input.value = '';
+            fetchBlacklist();
+        });
+    }
+}
+
+function deleteBlacklistWord(word) {
+    fetch('/api/blacklist', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({word: word})
+    }).then(() => {
+        fetchBlacklist();
+    });
+}
+
+// --- DESCOBERTA DE FÓRUNS (IA) ---
+function openDiscoverModal() {
+    document.getElementById('discover-modal').style.display = 'flex';
+    const container = document.getElementById('discover-container');
+    container.innerHTML = '<div style="text-align: center; width: 100%; color: var(--accent-color); padding: 2rem;">A IA está pensando e buscando os melhores fóruns pra você...<br><span style="font-size:0.8rem; color:var(--text-secondary)">(Isso leva uns 10 segundos)</span></div>';
+    
+    fetch('/api/discover-subreddits', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = '';
+            if (data.suggestions && data.suggestions.length > 0) {
+                data.suggestions.forEach(sub => {
+                    container.innerHTML += `
+                        <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 1rem; border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;">r/${sub}</span>
+                            <button onclick="addSuggestedSub('${sub}')" style="background: var(--accent-color); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-weight: bold; transition: opacity 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">+ Adicionar</button>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = '<div style="text-align: center; color: var(--danger-color); padding: 2rem;">A IA não conseguiu encontrar sugestões no momento. Tente novamente.</div>';
+            }
+        })
+        .catch(() => {
+            container.innerHTML = '<div style="text-align: center; color: var(--danger-color); padding: 2rem;">Erro ao conectar com a Inteligência Artificial.</div>';
+        });
+}
+
+function addSuggestedSub(sub) {
+    fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'subreddit', value: sub})
+    }).then(() => {
+        document.getElementById('discover-modal').style.display = 'none';
+        alert(`Sucesso! r/${sub} foi adicionado à sua lista de alvos.`);
+    });
+}

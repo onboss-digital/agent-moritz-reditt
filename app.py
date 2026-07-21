@@ -260,6 +260,79 @@ def del_config():
     conn.close()
     return jsonify({"success": True})
 
+# --- DESCOBERTA DE SUBREDDITS ---
+@app.route('/api/discover-subreddits', methods=['POST'])
+@login_required
+def discover_subreddits():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_database.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM subreddits")
+    current_subs = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+        )
+        prompt = f"Baseado nesta lista de fóruns do Reddit: {', '.join(current_subs)}. Me recomende exatamente 5 outros subreddits (apenas o nome, sem o 'r/') onde eu posso encontrar freelancers ou clientes de serviços digitais. Responda apenas com uma lista separada por vírgulas."
+        
+        response = client.chat.completions.create(
+            model="meta-llama/llama-3.3-70b-instruct:free",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
+        )
+        
+        texto = response.choices[0].message.content.strip()
+        suggestions = [s.strip().replace('r/', '') for s in texto.split(',') if s.strip()]
+        return jsonify({"suggestions": suggestions[:5]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- BLACKLIST ROUTES ---
+@app.route('/api/blacklist', methods=['GET'])
+@login_required
+def get_blacklist():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_database.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT word, added_by_ia FROM negative_keywords")
+        words = [{"word": row[0], "added_by_ia": bool(row[1])} for row in cursor.fetchall()]
+    except Exception:
+        words = []
+    conn.close()
+    return jsonify({"words": words})
+
+@app.route('/api/blacklist', methods=['POST'])
+@login_required
+def add_blacklist():
+    data = request.json
+    word = data.get('word', '').lower().strip()
+    if word:
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_database.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO negative_keywords (word, added_by_ia) VALUES (?, 0)", (word,))
+        conn.commit()
+        conn.close()
+    return jsonify({"success": True})
+
+@app.route('/api/blacklist', methods=['DELETE'])
+@login_required
+def del_blacklist():
+    data = request.json
+    word = data.get('word')
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_database.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM negative_keywords WHERE word=?", (word,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
 @app.route('/api/agent-config', methods=['GET'])
 @login_required
 def get_agent_config():
