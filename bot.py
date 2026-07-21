@@ -66,6 +66,10 @@ def setup_db():
         cursor.execute("ALTER TABLE keywords ADD COLUMN category TEXT DEFAULT 'creator'")
     cursor.execute('CREATE TABLE IF NOT EXISTS subreddits (name TEXT PRIMARY KEY)')
     
+    # Novas tabelas de Inteligência
+    cursor.execute('CREATE TABLE IF NOT EXISTS negative_keywords (word TEXT PRIMARY KEY, added_by_ia BOOLEAN DEFAULT 0)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS suggested_subreddits (name TEXT PRIMARY KEY, status TEXT DEFAULT "pending")')
+    
     cursor.execute('SELECT COUNT(*) FROM keywords')
     if cursor.fetchone()[0] == 0:
         default_kws = ["preciso trabalhar", "trabalho online", "renda extra", "ganhar dinheiro na internet", "sou freelancer", "dificuldade freelancer", "calote freelancer", "editor de vídeo", "design gráfico", "gestor de tráfego", "contratar freelancer", "preciso de editor de vídeo", "procurar designer", "agência de marketing", "dificuldade em", "problema com"]
@@ -94,7 +98,7 @@ def registrar_envio(conn, username, subreddit, keyword, title, message, permalin
         print(f"Erro ao registrar envio no banco: {e}")
 
 # ==========================================
-# IA - GERAÇÃO DE MENSAGEM COM FALLBACK
+# IA - GERAÇÃO DE MENSAGEM COM FALLBACK E FILTROS
 # ==========================================
 def atualizar_api_ativa(conn, api_name):
     try:
@@ -104,6 +108,57 @@ def atualizar_api_ativa(conn, api_name):
         conn.commit()
     except Exception as e:
         print(f"Erro ao salvar state: {e}")
+
+def analisar_intencao_e_aprender(conn, titulo, texto, keyword):
+    """ Filtro de Intenção e Blacklist Automática """
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+    
+    prompt = f"""
+Analise o post do Reddit abaixo para saber se ele é uma OPORTUNIDADE DE PROSPECÇÃO VÁLIDA para a plataforma Lumpic (um site para freelancers digitais tipo design, vídeo, tráfego, etc, e pessoas buscando contratá-los).
+
+Título: {titulo}
+Texto: {texto}
+
+É VÁLIDO SE: A pessoa claramente quer contratar um freelancer digital OU a pessoa claramente está oferecendo serviços digitais / buscando clientes.
+É INVÁLIDO SE: For apenas um desabafo (ex: fui roubado), for vaga presencial (ex: CLT em SP), for de graça/voluntário, ou não tiver nenhuma relação com serviços digitais freelance.
+
+Se for INVÁLIDO, identifique 1 ou 2 palavras do texto que entregam o motivo (ex: "presencial", "clt", "voluntario", "golpe", "desabafo"). Retorne apenas UMA palavra-chave principal ou expressão curta.
+
+Responda EXATAMENTE neste formato JSON e nada mais:
+{{"valido": true ou false, "palavra_negativa": "palavra_aqui" ou null}}
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="meta-llama/llama-3.3-70b-instruct:free",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        content = response.choices[0].message.content.strip()
+        
+        # Extrair JSON da resposta
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        if match:
+            dados = json.loads(match.group())
+            is_valido = dados.get('valido', True)
+            palavra_negativa = dados.get('palavra_negativa')
+            
+            if not is_valido and palavra_negativa:
+                # Aprender: Adicionar na blacklist
+                palavra_limpa = palavra_negativa.lower().strip()
+                cursor = conn.cursor()
+                cursor.execute("INSERT OR IGNORE INTO negative_keywords (word, added_by_ia) VALUES (?, 1)", (palavra_limpa,))
+                conn.commit()
+                print(f"     [IA APRENDEU] Post descartado. Adicionou '{palavra_limpa}' à Blacklist automática.")
+                return False
+            return is_valido
+    except Exception as e:
+        print(f"     [AVISO IA] Falha ao analisar intenção: {e}. Permitindo o post por segurança.")
+    
+    return True
 
 def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
     client = OpenAI(
@@ -119,32 +174,28 @@ def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
         convite = "Se quiser dar uma olhada depois, acho que pode te ajudar a arrumar mais freelas."
     
     prompt = f"""
-    Você é um usuário casual do Reddit tentando ajudar outra pessoa. Você NÃO é o dono da Lumpic, apenas alguém que conhece a plataforma e quer recomendá-la de forma muito natural e descontraída.
-    Encontramos este post no Reddit de um usuário:
+    Você é um usuário casual e prestativo do Reddit. Você descobriu recentemente uma plataforma incrível e quer indicá-la.
+    Encontramos este post no Reddit:
     
-    Título do Post: {titulo}
-    Texto do Post: {texto}
+    Título: {titulo}
+    Texto: {texto}
     
-    Escreva uma MENSAGEM PRIVADA descontraída, direta e empática.
+    Escreva uma MENSAGEM PRIVADA super curta, natural e direta (estilo WhatsApp) para essa pessoa.
     
-    PONTOS OBRIGATÓRIOS PARA INCLUIR NO TEXTO (Faça soar natural, como um comentário de fórum):
-    1. Cita rapidamente a dor ou o assunto que a pessoa relatou no post para gerar conexão.
-    2. Foco Central (Use essas informações sem parecer propaganda): "{perfil_foco}"
-    3. Finalize sugerindo de forma leve: "{convite}"
+    ESTRUTURA OBRIGATÓRIA DA MENSAGEM (Siga isso à risca, mas varie as palavras):
+    1. Saudação + Conexão rápida: "Opa, vi seu post sobre [assunto] e..."
+    2. A Indicação (Airbnb): Diga que conhece um site (Lumpic) que funciona tipo um Airbnb para serviços digitais.
+    3. O Diferencial: Destaque que o cadastro é 100% de graça, leva 2 minutos, e que já tem clientes/freelancers procurando fechar negócio lá ativamente.
+    4. Encerramento: Uma despedida curta que não pareça que você está vendendo algo.
     
-    REGRA DE GÊNERO IMPORTANTÍSSIMA:
-    - Analise o texto e o título do post para identificar o GÊNERO da pessoa (pela forma como ela escreve, ex: "estou cansada", "sou nova aqui").
-    - Se for MULHER, NÃO use gírias masculinas em hipótese alguma (nada de "cara", "mano", "velho").
-    - Se NÃO CONSEGUIR IDENTIFICAR o gênero com certeza, use uma saudação NEUTRA (Ex: "Opa, tudo bem?", "Fala aí!", "Oi!").
-    - Só use "Opa cara" se tiver certeza que é homem.
-    
-    EXEMPLO DO TOM DE VOZ IDEAL E ESTRUTURA (IMPORTANTE: Crie sempre frases e estruturas DIFERENTES desse exemplo, varie muito as palavras para não parecer um robô spammer):
-    "[Saudação de acordo com o gênero]! Vi seu post sobre [assunto] e sei bem como é isso. Queria te dar uma dica: {perfil_foco} {convite}"
+    REGRA DE GÊNERO:
+    - Identifique o gênero da pessoa pelo texto (ex: "estou cansada"). Se for mulher, NÃO use gírias masculinas. Se for incerto, use gênero neutro (ex: "Tudo bem?").
     
     REGRAS RÍGIDAS:
-    1. É TOTALMENTE PROIBIDO usar emojis.
-    2. Nunca pareça formal, um robô ou um vendedor. Pareça alguém dando uma dica de amigo.
-    3. Retorne APENAS o texto final da mensagem.
+    - MAXIMO DE 3 a 4 LINHAS. Ninguém gosta de ler textão.
+    - É TOTALMENTE PROIBIDO usar emojis.
+    - É TOTALMENTE PROIBIDO parecer o dono da plataforma ou um robô vendedor.
+    - Retorne APENAS o texto da mensagem.
     """
     
     # 1. Tentar OpenRouter Primeiro
@@ -302,6 +353,9 @@ def main():
         cursor.execute('SELECT name FROM subreddits')
         SUBREDDITS = [row[0] for row in cursor.fetchall()]
         
+        cursor.execute('SELECT word FROM negative_keywords')
+        BLACKLIST = [row[0].lower() for row in cursor.fetchall()]
+        
         cookies_dict = carregar_cookies()
         
         if not PALAVRAS_CHAVE or not SUBREDDITS:
@@ -346,32 +400,112 @@ def main():
                         titulo = info.get('title', '')
                         texto = info.get('selftext', '')
                         permalink = info.get('permalink', '#')
+                        created_utc = info.get('created_utc', 0)
+                        num_comments = info.get('num_comments', 0)
                         
                         if autor == '[deleted]' or autor == 'AutoModerator':
                             continue
                             
+                        # Filtro de Concorrência (Vagas Frescas)
+                        if num_comments > 20:
+                            continue
+                            
+                        # Ignora posts com mais de 30 dias (2592000 segundos)
+                        if time.time() - created_utc > 2592000:
+                            continue
+                            
                         conteudo_completo = (titulo + " " + texto).lower()
+                        
+                        # Filtro de Blacklist Local
+                        if any(bw in conteudo_completo for bw in BLACKLIST):
+                            continue
+                        
                         match_word = next((kw for kw in PALAVRAS_CHAVE.keys() if kw.lower() in conteudo_completo), None)
                         
                         if match_word:
                             if usuario_ja_contatado(conn, autor):
                                 continue # Pula silenciosamente quem já recebeu
                                 
-                            match_category = PALAVRAS_CHAVE[match_word]
-                                
-                            print(f"[!] ALVO ENCONTRADO: u/{autor} (Palavra: '{match_word}' | Categoria: {match_category})")
-                            alvos_encontrados.append({
-                                'autor': autor,
-                                'titulo': titulo,
-                                'texto': texto,
-                                'assunto': f"Sobre o seu post no r/{sub}",
-                                'sub': sub,
-                                'match': match_word,
-                                'categoria': match_category,
-                                'permalink': permalink
-                            })
+                            print(f"[?] Analisando intenção do post de u/{autor} com IA... (Palavra: '{match_word}')")
+                            
+                            if analisar_intencao_e_aprender(conn, titulo, texto, match_word):
+                                match_category = PALAVRAS_CHAVE[match_word]
+                                print(f"[!] ALVO APROVADO: u/{autor} (Categoria: {match_category})")
+                                alvos_encontrados.append({
+                                    'autor': autor,
+                                    'titulo': titulo,
+                                    'texto': texto,
+                                    'assunto': f"Sobre o seu post no r/{sub}",
+                                    'sub': sub,
+                                    'match': match_word,
+                                    'categoria': match_category,
+                                    'permalink': permalink
+                                })
+                            else:
+                                # Atualiza a blacklist para o próximo loop em tempo real
+                                cursor.execute('SELECT word FROM negative_keywords')
+                                BLACKLIST = [row[0].lower() for row in cursor.fetchall()]
             except Exception as e:
                 print(f"Erro no subreddit {sub}: {e}")
+                
+        # FASE 1.5: Leitura de Comentários (Oceano Azul)
+        for sub in SUBREDDITS:
+            print(f"\nBuscando comentários recentes no r/{sub}...")
+            url = f"https://www.reddit.com/r/{sub}/comments.json?limit=100"
+            try:
+                response = requests.get(url, headers=headers, cookies=cookies_dict)
+                if response.status_code != 200:
+                    continue
+                    
+                dados = response.json()
+                if 'data' in dados and 'children' in dados['data']:
+                    for comment in dados['data']['children']:
+                        info = comment['data']
+                        autor = info.get('author', '')
+                        # Comentários tem 'body' em vez de 'selftext' e não tem 'title'
+                        texto = info.get('body', '')
+                        titulo = "Comentário em Post"
+                        permalink = info.get('permalink', '#')
+                        created_utc = info.get('created_utc', 0)
+                        
+                        if autor == '[deleted]' or autor == 'AutoModerator':
+                            continue
+                            
+                        # Limite de 30 dias
+                        if time.time() - created_utc > 2592000:
+                            continue
+                            
+                        conteudo_completo = texto.lower()
+                        
+                        # Blacklist
+                        if any(bw in conteudo_completo for bw in BLACKLIST):
+                            continue
+                        
+                        match_word = next((kw for kw in PALAVRAS_CHAVE.keys() if kw.lower() in conteudo_completo), None)
+                        
+                        if match_word:
+                            if usuario_ja_contatado(conn, autor):
+                                continue
+                                
+                            print(f"[?] Analisando intenção do COMENTÁRIO de u/{autor} com IA...")
+                            if analisar_intencao_e_aprender(conn, titulo, texto, match_word):
+                                match_category = PALAVRAS_CHAVE[match_word]
+                                print(f"[!] ALVO (COMENTÁRIO) APROVADO: u/{autor}")
+                                alvos_encontrados.append({
+                                    'autor': autor,
+                                    'titulo': titulo,
+                                    'texto': texto,
+                                    'assunto': f"Sobre o seu comentário no r/{sub}",
+                                    'sub': sub,
+                                    'match': match_word,
+                                    'categoria': match_category,
+                                    'permalink': permalink
+                                })
+                            else:
+                                cursor.execute('SELECT word FROM negative_keywords')
+                                BLACKLIST = [row[0].lower() for row in cursor.fetchall()]
+            except Exception as e:
+                pass
                 
         # FASE 2: Geração e Envio
         if not alvos_encontrados:
