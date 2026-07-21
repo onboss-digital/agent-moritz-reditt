@@ -112,26 +112,25 @@ def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
     )
     
     if categoria == "empresa":
-        perfil_foco = "Ela conecta profissionais do mercado digital (como designers, editores de vídeo e gestores de tráfego) diretamente com empresas e clientes que precisam desses serviços todos os dias, de um jeito simples e prático. O melhor é que você pode buscar talentos e publicar suas necessidades de forma totalmente gratuita."
-        convite = "Se tiver interesse em encontrar bons profissionais, me chama que te envio o link."
+        perfil_foco = "Tem uma plataforma chamada Lumpic que conecta profissionais do mercado digital (como designers e editores de vídeo) diretamente com pessoas que precisam desses serviços. É de graça pra postar o que você precisa."
+        convite = "Dá uma olhada depois, acho que pode te ajudar a achar alguém bom."
     else:
-        perfil_foco = "Ela conecta profissionais do mercado digital, como designers, editores de vídeo, gestores de tráfego e outros freelancers, diretamente com clientes que procuram esses serviços todos os dias, de um jeito simples e prático. O melhor é que criar o perfil e publicar seus serviços é totalmente gratuito."
-        convite = "Se tiver interesse, me chama que te envio o link para você cadastrar seus jobs."
+        perfil_foco = "Tem um site novo chamado Lumpic que funciona tipo um Airbnb pra serviços digitais. Dá pra criar um perfil de graça e oferecer seus trampos pra quem tá procurando."
+        convite = "Se quiser dar uma olhada depois, acho que pode te ajudar a arrumar mais freelas."
     
     prompt = f"""
-    Você é o criador da Lumpic, uma plataforma voltada para o mercado digital.
-    Encontramos este post no Reddit de um potencial alvo:
+    Você é um usuário casual do Reddit tentando ajudar outra pessoa. Você NÃO é o dono da Lumpic, apenas alguém que conhece a plataforma e quer recomendá-la de forma muito natural e descontraída.
+    Encontramos este post no Reddit de um usuário:
     
     Título do Post: {titulo}
     Texto do Post: {texto}
     
-    Escreva uma MENSAGEM PRIVADA descontraída, direta e persuasiva para essa pessoa.
+    Escreva uma MENSAGEM PRIVADA descontraída, direta e empática.
     
-    PONTOS OBRIGATÓRIOS PARA INCLUIR NO TEXTO (Faça soar natural e informal):
+    PONTOS OBRIGATÓRIOS PARA INCLUIR NO TEXTO (Faça soar natural, como um comentário de fórum):
     1. Cita rapidamente a dor ou o assunto que a pessoa relatou no post para gerar conexão.
-    2. Apresente a Lumpic como "o Airbnb dos serviços digitais".
-    3. Foco Central (Use essas informações): "{perfil_foco}"
-    4. Finalize dizendo: "{convite}"
+    2. Foco Central (Use essas informações sem parecer propaganda): "{perfil_foco}"
+    3. Finalize sugerindo de forma leve: "{convite}"
     
     REGRA DE GÊNERO IMPORTANTÍSSIMA:
     - Analise o texto e o título do post para identificar o GÊNERO da pessoa (pela forma como ela escreve, ex: "estou cansada", "sou nova aqui").
@@ -139,19 +138,19 @@ def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
     - Se NÃO CONSEGUIR IDENTIFICAR o gênero com certeza, use uma saudação NEUTRA (Ex: "Opa, tudo bem?", "Fala aí!", "Oi!").
     - Só use "Opa cara" se tiver certeza que é homem.
     
-    EXEMPLO DO TOM DE VOZ IDEAL E ESTRUTURA (Varie as palavras a cada mensagem gerada para não ser considerado Spam):
-    "[Saudação de acordo com o gênero]! Tava lendo seu post sobre a dificuldade de [assunto] e entendo bem essa situação. Queria te apresentar a Lumpic, que funciona como o Airbnb dos serviços digitais. {perfil_foco} {convite}"
+    EXEMPLO DO TOM DE VOZ IDEAL E ESTRUTURA (IMPORTANTE: Crie sempre frases e estruturas DIFERENTES desse exemplo, varie muito as palavras para não parecer um robô spammer):
+    "[Saudação de acordo com o gênero]! Vi seu post sobre [assunto] e sei bem como é isso. Queria te dar uma dica: {perfil_foco} {convite}"
     
     REGRAS RÍGIDAS:
     1. É TOTALMENTE PROIBIDO usar emojis.
-    2. Nunca pareça formal ou engessado.
+    2. Nunca pareça formal, um robô ou um vendedor. Pareça alguém dando uma dica de amigo.
     3. Retorne APENAS o texto final da mensagem.
     """
     
     # 1. Tentar OpenRouter Primeiro
     try:
         response = client.chat.completions.create(
-            model="google/gemini-2.5-flash:free",
+            model="meta-llama/llama-3.3-70b-instruct:free",
             messages=[
                 {"role": "user", "content": prompt}
             ],
@@ -173,7 +172,26 @@ def gerar_mensagem_ia(conn, titulo, texto, categoria="creator"):
         return resposta.text.strip()
     except Exception as e2:
         print(f"[ERRO IA FATAL] Ambas as APIs falharam (OpenRouter e Gemini Nativo). Erro Gemini: {e2}")
-        return "Olá! Vi seu post e gostaria de apresentar a Lumpic, uma plataforma grátis de freelancing focada no mercado digital. Se tiver interesse, me mande uma mensagem!"
+        
+        # Fallbacks de emergência variados para não repetir a mesma mensagem caso a IA fique fora do ar muito tempo
+        mensagens_emergencia_creator = [
+            "Opa, tudo bem? Vi seu post agora há pouco. Dá uma olhada numa plataforma chamada Lumpic, ela conecta freelancers com quem precisa de serviço. Pode te ajudar a arrumar uns trampos novos, o cadastro é de graça.",
+            "Fala aí! Lendo o que você postou, lembrei de um site que uso chamado Lumpic. É focado em freelas no digital (design, vídeo, etc). Recomendo dar uma checada, me ajudou bastante recentemente.",
+            "Oi! Vi seu post e lembrei da Lumpic. É uma plataforma pra freelancers conseguirem jobs e divulgarem portfólio. Não custa nada criar o perfil lá, acho que vale a pena pra você testar."
+        ]
+        
+        mensagens_emergencia_empresa = [
+            "Opa, vi que você tá procurando profissionais. Tem um site chamado Lumpic que é muito bom pra encontrar freelancers (design, tráfego, vídeo). Dá pra postar a vaga de graça lá.",
+            "Tudo bem? Sobre o seu post, recomendo dar uma olhada na Lumpic. É uma plataforma que junta vários freelancers, fica bem mais fácil achar gente capacitada pro que você precisa.",
+            "Fala aí! Se ainda estiver precisando, tenta buscar na Lumpic. É um site novo pra serviços digitais, tipo um classificados de freelas. É bem prático pra achar bons profissionais."
+        ]
+        
+        if categoria == "empresa":
+            msg_final = random.choice(mensagens_emergencia_empresa)
+        else:
+            msg_final = random.choice(mensagens_emergencia_creator)
+            
+        return msg_final
 
 
 # ==========================================
